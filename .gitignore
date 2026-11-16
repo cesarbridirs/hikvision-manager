@@ -1,0 +1,45 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.env
+.env.*
+
+# Per-installation databases, credentials, certificates and logs.
+data/
+secrets/
+certs/
+logs/
+runtime/
+*.db
+*.db-*
+*.sqlite*
+*.key
+*.pem
+*.crt
+*.pfx
+*.p12
+*.log
+*.bak
+*.backup*
+*.zip
+
+# Operational exports and local inventory.
+nvrs*.txt
+cameras*.txt
+resultado*.txt
+*.csv
+*.xlsx
+*.xml
+*.json
+!*.example.json
+
+# Compiled service and local screenshots.
+ServicoWindows/*.exe
+ServicoWindows/*.config
+tests/artifacts/
+*.png
+*.jpg
+.vscode/
+.idea/

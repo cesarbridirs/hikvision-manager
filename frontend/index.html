@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hikvision Manager</title>
+  <link rel="stylesheet" href="/styles.css?v=20261023h">
+  <link rel="stylesheet" href="/workspace.css?v=20261023m">
+</head>
+<body>
+  <section class="login-screen" id="login-screen" hidden>
+    <form id="login-form" class="login-box">
+      <h1>Hikvision Manager</h1>
+      <p>Entre para acessar o painel.</p>
+      <input name="username" placeholder="Usuario" value="admin" required>
+      <input name="password" placeholder="Senha" type="password" required>
+      <button type="submit">Entrar</button>
+      <span id="login-error"></span>
+    </form>
+  </section>
+
+  <section class="login-screen" id="change-password-screen" hidden>
+    <form id="change-password-form" class="login-box">
+      <h1>Trocar senha</h1>
+      <p>Por seguranca, altere sua senha inicial.</p>
+      <input name="current_password" placeholder="Senha atual" type="password" required>
+      <input name="new_password" placeholder="Nova senha" type="password" required>
+      <input name="confirm_password" placeholder="Confirmar nova senha" type="password" required>
+      <button type="submit">Salvar nova senha</button>
+      <span id="change-password-error"></span>
+    </form>
+  </section>
+
+  <div id="app-shell" hidden>
+  <header>
+    <button id="toggle-sidebar" class="secondary icon-button" title="Mostrar localizacoes" aria-label="Mostrar localizacoes"><i data-lucide="panel-left"></i></button>
+    <div class="workspace-brand"><span class="brand-mark">UCS</span><h1>CFTV Manager</h1></div>
+    <nav class="workspace-menu" aria-label="Menu principal">
+      <details><summary>Visoes</summary><div><button data-view="nvrs">NVRs</button><button data-view="changes">Alteracoes de IP</button></div></details>
+      <details><summary>Ferramentas</summary><div><button data-view="alerts">Alertas</button><button id="menu-ack">Reconhecidos</button><button data-view="schedule" class="admin-only">Agendamento</button><button id="menu-history">Historico de execucoes</button><button id="menu-hdds" class="admin-only">Consultar HDDs</button><button id="menu-refresh">Atualizar dados</button></div></details>
+      <details class="admin-only"><summary>Cadastro</summary><div><button data-view="locations">Cidades e blocos</button><button data-view="users">Usuarios</button><button id="menu-import">Importar nvrs.txt</button></div></details>
+    </nav>
+    <div class="top-actions">
+      <button id="open-nvr-modal" class="admin-only">Novo NVR</button>
+      <button id="open-import-modal" class="secondary admin-only">Importar nvrs.txt</button>
+      <button id="run-verify-now" class="admin-only">Verificar agora todos</button>
+      <button id="run-hdds" class="admin-only">Consultar HDDs</button>
+      <button id="refresh" class="secondary">Atualizar</button>
+      <button id="logout" class="secondary">Sair</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary">
+      <div><strong id="total-nvrs">0</strong><span>NVRs</span></div>
+      <div><strong id="total-channels">0</strong><span>Canais</span></div>
+      <div><strong id="total-alerts">0</strong><span>Alertas</span></div>
+      <div><strong id="total-offline">0</strong><span>Offline</span></div>
+      <div><strong id="total-no-recording">0</strong><span>Sem gravacao</span></div>
+      <div><strong id="total-errors">0</strong><span>Erros</span></div>
+    </section>
+
+    <section class="operation-status" id="operation-status" hidden>
+      <div class="operation-spinner" aria-hidden="true"></div>
+      <div>
+        <strong id="operation-title">Executando</strong>
+        <span id="operation-message">Aguarde...</span>
+      </div>
+    </section>
+
+    <section class="panel scheduler-panel">
+      <div class="panel-head">
+        <h2>Execucao Automatica</h2>
+        <span id="scheduler-state" class="muted"></span>
+      </div>
+      <div class="scheduler-saved" id="scheduler-saved"></div>
+      <div class="scheduler-controls">
+        <label><input type="checkbox" id="scheduler-enabled"> Ativo</label>
+        <label>Intervalo <input type="number" id="scheduler-interval" min="1" value="30"> min</label>
+        <label>Busca global <input type="number" id="global-lookback" min="1" value="720"> min</label>
+        <button id="save-scheduler" class="secondary admin-only">Salvar</button>
+        <button id="run-scheduler-now" class="admin-only">Executar agora</button>
+        <button id="open-scheduler-history" class="secondary">Historico</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Alertas Atuais</h2>
+        <div class="alert-tools">
+          <label><input type="checkbox" id="filter-no-recording" checked> Sem gravacao</label>
+          <label><input type="checkbox" id="filter-change" checked> Alteracao</label>
+          <label><input type="checkbox" id="filter-hdd" checked> HDD</label>
+          <button id="open-ack-alerts" class="secondary">Reconhecidos</button>
+          <span id="alert-count"></span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>NVR</th>
+              <th>Canal / HDD</th>
+              <th>TrackID</th>
+              <th>IP Camera</th>
+              <th>Status</th>
+              <th>Mensagem</th>
+              <th>Ultima Checagem</th>
+              <th class="admin-only">Acoes</th>
+            </tr>
+          </thead>
+          <tbody id="alert-list"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>NVRs</h2>
+        <span id="list-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>URL</th>
+              <th>Canais</th>
+              <th>Acoes</th>
+            </tr>
+          </thead>
+          <tbody id="nvr-list"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Alteracoes de IP das Cameras</h2>
+        <span id="ip-change-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>NVR</th>
+              <th>Canal</th>
+              <th>TrackID</th>
+              <th>IP Anterior</th>
+              <th>IP Novo</th>
+              <th>Tipo</th>
+            </tr>
+          </thead>
+          <tbody id="ip-change-list"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <section id="locations-panel" class="panel admin-only" hidden>
+    <div class="panel-head"><h2>Cidades e blocos</h2></div>
+    <form id="location-form" class="location-form">
+      <input type="hidden" name="id">
+      <label>Cidade<input name="city" list="city-options" required maxlength="120"></label>
+      <datalist id="city-options"></datalist>
+      <label>Bloco<input name="block" required maxlength="120"></label>
+      <button type="submit">Salvar</button><button type="button" id="cancel-location" class="secondary">Cancelar</button>
+    </form>
+    <p id="location-message" role="status"></p>
+    <div class="table-wrap"><table><thead><tr><th>Cidade</th><th>Bloco</th><th>NVRs</th><th>Acoes</th></tr></thead><tbody id="location-list"></tbody></table></div>
+  </section>
+
+  <section id="users-panel" class="panel admin-only" hidden>
+    <div class="panel-head"><h2>Usuarios de visualizacao</h2></div>
+    <form id="user-form" class="user-form">
+      <input type="hidden" name="id">
+      <label>Usuario<input name="username" autocomplete="off" required minlength="3" maxlength="64" pattern="(?:[A-Za-z0-9._]|-)+"></label>
+      <label>Senha inicial<input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128"></label>
+      <fieldset class="user-cities"><legend>Cidades com acesso</legend><div id="user-create-city-options"></div></fieldset>
+      <button type="submit" id="user-submit">Cadastrar</button>
+      <button type="button" id="user-cancel" class="secondary" hidden>Cancelar</button>
+    </form>
+    <form id="user-cities-form" class="user-form" hidden>
+      <input type="hidden" name="id">
+      <fieldset class="user-cities"><legend id="user-cities-title">Cidades com acesso</legend><div id="user-edit-city-options"></div></fieldset>
+      <button type="submit">Salvar cidades</button>
+      <button type="button" id="user-cities-cancel" class="secondary">Cancelar</button>
+    </form>
+    <p id="users-message" role="status"></p>
+    <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Perfil</th><th>Cidades</th><th>Troca de senha</th><th>Criado em</th><th>Acoes</th></tr></thead><tbody id="users-list"></tbody></table></div>
+  </section>
+
+  <div class="modal" id="nvr-modal" hidden>
+      <div class="modal-box">
+      <div class="modal-head">
+        <h2 id="nvr-modal-title">Novo NVR</h2>
+        <button class="secondary icon-button" data-close-modal="nvr-modal">x</button>
+      </div>
+      <form id="nvr-form" class="modal-form">
+        <input name="id" type="hidden">
+        <label>Nome do NVR<input name="name" placeholder="Ex: NVR_CIDADE_A" required></label>
+        <label>IP ou URL<input name="ip" placeholder="Ex: 192.0.2.39 ou http://192.0.2.39" required></label>
+        <label>Usuario<input name="username" placeholder="Usuario de acesso ao NVR" required></label>
+        <label>Senha<input name="password" placeholder="Deixe em branco ao editar para manter a senha" type="password"></label>
+        <label>Cidade<select id="nvr-city"><option value="">Sem localizacao</option></select></label>
+        <label>Bloco<select id="nvr-location" name="location_id"><option value="">Sem localizacao</option></select></label>
+        <label class="checkbox-field"><input id="nvr-use-global" type="checkbox" checked> Usar busca global</label>
+        <label>Busca individual em minutos<input name="lookback_minutes" placeholder="720 = 12 horas" type="number" value="720" min="1" max="525600" disabled></label>
+        <label>GMT do NVR<input name="nvr_time_offset_hours" placeholder="-3 para Brasilia/Sao Paulo" type="number" value="-3"></label>
+        <button type="submit" id="nvr-submit">Adicionar</button>
+        <span id="nvr-form-error" role="alert"></span>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="import-modal" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>Importar nvrs.txt</h2>
+        <button class="secondary icon-button" data-close-modal="import-modal">x</button>
+      </div>
+      <textarea id="import-text" rows="8" placeholder="Cole aqui linhas no formato NOME;IP;USER;SENHA"></textarea>
+      <div class="modal-actions">
+        <button id="import-btn">Importar</button>
+        <span id="import-result"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="scheduler-history-modal" hidden>
+    <div class="modal-box wide-modal">
+      <div class="modal-head">
+        <h2>Historico de Execucoes</h2>
+        <button class="secondary icon-button" data-close-modal="scheduler-history-modal">x</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Inicio</th>
+              <th>Fim</th>
+              <th>Status</th>
+              <th>Descoberta</th>
+              <th>Verificacao</th>
+              <th>Mensagem</th>
+            </tr>
+          </thead>
+          <tbody id="scheduler-history-list"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="ack-alerts-modal" hidden>
+    <div class="modal-box wide-modal">
+      <div class="modal-head">
+        <h2>Alertas Reconhecidos</h2>
+        <div class="modal-head-actions">
+          <button id="delete-all-ack-alerts" class="danger admin-only">Excluir todos</button>
+          <button class="secondary icon-button" data-close-modal="ack-alerts-modal">x</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Reconhecido em</th>
+              <th>NVR</th>
+              <th>Canal</th>
+              <th>TrackID</th>
+              <th>Tipo</th>
+              <th>Status</th>
+              <th>IP/Alteracao</th>
+              <th class="admin-only">Acoes</th>
+            </tr>
+          </thead>
+          <tbody id="ack-alerts-list"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="snapshot-modal" hidden>
+    <div class="modal-box snapshot-box">
+      <div class="modal-head">
+        <h2 id="snapshot-title">Imagem da Camera</h2>
+        <button class="secondary icon-button" data-close-modal="snapshot-modal">x</button>
+      </div>
+      <div class="snapshot-toolbar">
+        <span id="snapshot-status">Carregando imagem...</span>
+        <button id="refresh-snapshot" class="secondary">Atualizar imagem</button>
+      </div>
+      <div class="snapshot-viewer">
+        <img id="snapshot-image" alt="Imagem atual da camera">
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=20261106a"></script>
+  <script src="/lucide.min.js"></script>
+  <script src="/workspace.js?v=20261106a"></script>
+  </div>
+</body>
+</html>
